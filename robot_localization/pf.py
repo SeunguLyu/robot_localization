@@ -242,14 +242,23 @@ class ParticleFilter(Node):
         if xy_theta is None:
             xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose)
         self.particle_cloud = []
+
         # TODO create particles
+        unit = 5.0
+        for i in range(self.n_particles):
+            x = xy_theta[0] + np.random.random() * unit
+            y = xy_theta[1] + np.random.random() * unit
+            theta = np.random.randint(360)
+            self.particle_cloud.append(Particle(x=x, y=y theta=theta))
 
         self.normalize_particles()
 
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
         # TODO: implement this
-        pass
+        total_weight = np.sum(self.particle_cloud, axis=0)[3]
+        for particle in self.particle_cloud:
+            particle.w = particle.w/total_weight
 
     def publish_particles(self, timestamp):
         particles_conv = []
