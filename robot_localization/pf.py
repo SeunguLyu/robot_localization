@@ -74,7 +74,8 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 300          # the number of particles to use
+        self.n_particles = 1          # the number of particles to use
+        self.particle_init_range = 5
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
@@ -244,19 +245,22 @@ class ParticleFilter(Node):
         self.particle_cloud = []
 
         # TODO create particles
-        unit = 5.0
+        unit = self.particle_init_range
         for i in range(self.n_particles):
-            x = xy_theta[0] + np.random.random() * unit
-            y = xy_theta[1] + np.random.random() * unit
+            x = xy_theta[0] + np.random.random() * unit - unit/2
+            y = xy_theta[1] + np.random.random() * unit - unit/2
             theta = np.random.randint(360)
-            self.particle_cloud.append(Particle(x=x, y=y theta=theta))
+            self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
         self.normalize_particles()
 
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
         # TODO: implement this
-        total_weight = np.sum(self.particle_cloud, axis=0)[3]
+        total_weight = 0
+        for particle in self.particle_cloud:
+            total_weight += particle.w
+
         for particle in self.particle_cloud:
             particle.w = particle.w/total_weight
 
