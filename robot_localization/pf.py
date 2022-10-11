@@ -74,7 +74,7 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 1          # the number of particles to use
+        self.n_particles = 300          # the number of particles to use
         self.particle_init_range = 5
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
@@ -146,7 +146,7 @@ class ParticleFilter(Node):
             return
         
         (r, theta) = self.transform_helper.convert_scan_to_polar_in_robot_frame(msg, self.base_frame)
-        print("r[0]={0}, theta[0]={1}".format(r[0], theta[0]))
+        #print("r[0]={0}, theta[0]={1}".format(r[0], theta[0]))
         # clear the current scan so that we can process the next one
         self.scan_to_process = None
 
@@ -210,6 +210,19 @@ class ParticleFilter(Node):
             return
 
         # TODO: modify particles using delta
+        #print("x: {0}, y: {1}, yaw: {2}".format(*delta))
+        angle1 = old_odom_xy_theta[2]
+        angle2 = math.atan2(new_odom_xy_theta[1] - old_odom_xy_theta[1], new_odom_xy_theta[0] - old_odom_xy_theta[0])
+        u_theta = angle1 - angle2
+        u_r = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
+
+        #print(u_r, math.degrees(u_theta))
+        for particle in self.particle_cloud:
+            p_theta = particle.theta - u_theta
+            particle.x += u_r * math.cos(p_theta)
+            particle.y += u_r * math.sin(p_theta)
+            particle.theta += delta[2]
+
 
     def resample_particles(self):
         """ Resample the particles according to the new particle weights.
@@ -251,6 +264,13 @@ class ParticleFilter(Node):
             y = xy_theta[1] + np.random.random() * unit - unit/2
             theta = np.random.randint(360)
             self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
+
+            # Testing purpose
+            # x = xy_theta[0]
+            # y = xy_theta[1]
+            # theta = xy_theta[2]
+            # self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
+
 
         self.normalize_particles()
 
