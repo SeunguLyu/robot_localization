@@ -238,6 +238,13 @@ class ParticleFilter(Node):
 
                 # QUESTION: should I change the weight of the particles as well?
 
+                # add noise to the particles
+                position_noise = 0.5
+                theta_noise = 0.5
+                particle.x = np.random.normal(loc=particle.x, scale=particle.w * noise)
+                particle.y = np.random.normal(loc=particle.y, scale=particle.w * noise)
+                particle.theta = np.random.normal(loc=particle.theta, scale=particle.w * noise)
+
             # update particle_cloud
             self.particle_cloud = np.concatenate((resample, unsampled))
 
