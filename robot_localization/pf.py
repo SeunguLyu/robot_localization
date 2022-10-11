@@ -232,7 +232,34 @@ class ParticleFilter(Node):
         """
         # make sure the distribution is normalized
         self.normalize_particles()
+        
         # TODO: fill out the rest of the implementation
+        # if the particle cloud is not empty
+        if self.particle_cloud:
+            probabilities = [particle.w for particle in self.particle_cloud]
+            resample_num = 1
+            resample = draw_random_sample(self.particle_cloud, probabilities, resample_num)
+
+            # update the resampled particle's locations 
+            unsampled = np.setdiff1d(self.particle_cloud, resample)
+            for particle in resample:
+                # update resample particle location with a randomly selected particle that was not resampled
+                replacement = np.random.choice(unsampled)
+                particle.x = replacement.x
+                particle.y = replacement.y
+                particle.theta = replacement.theta
+
+                # QUESTION: should I change the weight of the particles as well?
+
+                # add noise to the particles
+                position_noise = 0.5
+                theta_noise = 0.5
+                particle.x = np.random.normal(loc=particle.x, scale=particle.w * noise)
+                particle.y = np.random.normal(loc=particle.y, scale=particle.w * noise)
+                particle.theta = np.random.normal(loc=particle.theta, scale=particle.w * noise)
+
+            # update particle_cloud
+            self.particle_cloud = np.concatenate((resample, unsampled))
 
     def update_particles_with_laser(self, r, theta):
         """ Updates the particle weights in response to the scan data
