@@ -214,13 +214,13 @@ class ParticleFilter(Node):
         angle1 = old_odom_xy_theta[2]
         angle2 = math.atan2(new_odom_xy_theta[1] - old_odom_xy_theta[1], new_odom_xy_theta[0] - old_odom_xy_theta[0])
         u_theta = angle1 - angle2
-        u_r = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
+        u_d = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
 
         #print(u_r, math.degrees(u_theta))
         for particle in self.particle_cloud:
             p_theta = particle.theta - u_theta
-            particle.x += u_r * math.cos(p_theta)
-            particle.y += u_r * math.sin(p_theta)
+            particle.x += u_d * math.cos(p_theta)
+            particle.y += u_d * math.sin(p_theta)
             particle.theta += delta[2]
 
 
@@ -235,31 +235,31 @@ class ParticleFilter(Node):
         
         # TODO: fill out the rest of the implementation
         # if the particle cloud is not empty
-        # if self.particle_cloud:
-        #     probabilities = [particle.w for particle in self.particle_cloud]
-        #     resample_num = 1
-        #     resample = draw_random_sample(self.particle_cloud, probabilities, resample_num)
+        if self.particle_cloud:
+            probabilities = [particle.w for particle in self.particle_cloud]
+            resample_num = 1
+            resample = draw_random_sample(self.particle_cloud, probabilities, resample_num)
 
-        #     # update the resampled particle's locations 
-        #     unsampled = np.setdiff1d(self.particle_cloud, resample)
-        #     for particle in resample:
-        #         # update resample particle location with a randomly selected particle that was not resampled
-        #         replacement = np.random.choice(unsampled)
-        #         particle.x = replacement.x
-        #         particle.y = replacement.y
-        #         particle.theta = replacement.theta
+            # update the resampled particle's locations 
+            unsampled = np.setdiff1d(self.particle_cloud, resample)
+            for particle in resample:
+                # update resample particle location with a randomly selected particle that was not resampled
+                replacement = np.random.choice(unsampled)
+                particle.x = replacement.x
+                particle.y = replacement.y
+                particle.theta = replacement.theta
 
-        #         # QUESTION: should I change the weight of the particles as well?
+                # QUESTION: should I change the weight of the particles as well?
 
-        #         # add noise to the particles
-        #         position_noise = 0.5
-        #         theta_noise = 0.5
-        #         particle.x = np.random.normal(loc=particle.x, scale=particle.w * position_noise)
-        #         particle.y = np.random.normal(loc=particle.y, scale=particle.w * position_noise)
-        #         particle.theta = np.random.normal(loc=particle.theta, scale=particle.w * theta_noise)
+                # add noise to the particles
+                position_noise = 0.5
+                theta_noise = 0.5
+                particle.x = np.random.normal(loc=particle.x, scale=particle.w * position_noise)
+                particle.y = np.random.normal(loc=particle.y, scale=particle.w * position_noise)
+                particle.theta = np.random.normal(loc=particle.theta, scale=particle.w * theta_noise)
 
-        #     # update particle_cloud
-        #     self.particle_cloud = np.concatenate((resample, unsampled))
+            # update particle_cloud
+            self.particle_cloud = np.concatenate((resample, unsampled))
 
     def update_particles_with_laser(self, r, theta):
         """ Updates the particle weights in response to the scan data
@@ -292,7 +292,7 @@ class ParticleFilter(Node):
             theta = np.random.randint(360)
             self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
-            # Testing purpose
+            # # Testing purpose
             # x = xy_theta[0]
             # y = xy_theta[1]
             # theta = xy_theta[2]
