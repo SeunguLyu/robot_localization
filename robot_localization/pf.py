@@ -77,7 +77,7 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 300      # the number of particles to use
+        self.n_particles = 100      # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
@@ -169,7 +169,7 @@ class ParticleFilter(Node):
             self.update_particles_with_odom()    # update based on odometry
             self.update_particles_with_laser(r, theta)   # update based on laser scan
             self.update_robot_pose()                # update robot's pose based on particles
-            self.resample_particles()               # resample particles to focus on areas of high density
+            #self.resample_particles()               # resample particles to focus on areas of high density
         # publish particles (so things like rviz can see them)
         self.publish_particles(msg.header.stamp)
 
@@ -260,8 +260,7 @@ class ParticleFilter(Node):
         # if the particle cloud is not empty
         if self.particle_cloud:
             probabilities = [particle.w for particle in self.particle_cloud]
-            unsample_num = round(self.n_particles * self.resample_percentage)
-            unsampled = draw_random_sample(self.particle_cloud, probabilities, unsample_num)
+            self.particle_cloud = draw_random_sample(self.particle_cloud, probabilities, self.n_particles)
 
             #print(probabilities)
             #print(self.particle_cloud)
@@ -269,15 +268,7 @@ class ParticleFilter(Node):
 
             resample = []
 
-            while(len(unsampled) + len(resample) < self.n_particles):
-                # update resample particle location with a randomly selected particle that was not resampled
-                particle = Particle()
-                replacement = np.random.choice(unsampled)
-                particle.x = replacement.x
-                particle.y = replacement.y
-                particle.theta = replacement.theta
-                particle.w = replacement.w
-
+            for particle in self.particle_cloud:
                 # add noise to the particles
                 position_noise = 3
                 theta_noise = 3
@@ -285,11 +276,6 @@ class ParticleFilter(Node):
                 particle.y = np.random.normal(loc=particle.y, scale=particle.w * position_noise)
                 particle.theta = np.random.normal(loc=particle.theta, scale=particle.w * theta_noise)
 
-                resample.append(particle)
-
-            # update particle_cloud
-            self.particle_cloud = unsampled + resample
-            #print(self.particle_cloud)
 
     def create_marker(self, x, y) -> Marker:
         # create a sphere marker at object centroid location
@@ -324,12 +310,12 @@ class ParticleFilter(Node):
             for deg in range(0, 360):
                 x = particle.x + r[deg] * math.cos(theta[deg] + particle.theta) # unsure if it is 'theta + deg' or 'theta + particle.theta' or 'deg + particle.theta'
                 y = particle.y + r[deg] * math.sin(theta[deg] + particle.theta)
-                if (math.isinf(x) or math.isinf(y) or math.isnan(x) or math.isnan(y)):
-                    continue
-                obstacle_dist = self.occupancy_field.get_closest_obstacle_distance(x=x, y=y)
-                if not math.isnan(obstacle_dist):
-                    dist_tot += obstacle_dist
-                    total_num += 1
+                if (math.isnan(self.occupancy_field.get_closest_obstacle_distance(x=x, y=y))):
+                    dist_tot += 1000.0
+                else:
+                    dist_tot += self.occupancy_field.get_closest_obstacle_distance(x=x, y=y)
+                
+                total_num += 1
 
                 # if deg == 90:
                 #     print(particle.x)
@@ -340,11 +326,8 @@ class ParticleFilter(Node):
                 #     marker = self.create_marker(x,y)
                 #     self.pub_marker.publish(marker)
 
-            if total_num > 0 and dist_tot != 0:
-                distance_average = dist_tot/total_num
-                particle.w = 1/distance_average
-            else:
-                particle.w = 0
+            dist_mean = dist_tot/total_num
+            particle.w = 1/dist_mean
                 
             # update particle weight based on dist_tot
             
