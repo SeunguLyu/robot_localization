@@ -11,6 +11,7 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, Pose, Point, Quaternion
 from rclpy.duration import Duration
 import math
+from cmath import rect, phase
 import time
 import numpy as np
 from occupancy_field import OccupancyField
@@ -74,13 +75,13 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 300          # the number of particles to use
-        self.particle_init_range = 5
+        self.n_particles = 300      # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
         # TODO: define additional constants if needed
+        self.particle_init_range = 5
 
         # pose_listener responds to selection of a new approximate robot location (for instance using rviz)
         self.create_subscription(PoseWithCovarianceStamped, 'initialpose', self.update_initial_pose, 10)
@@ -152,7 +153,7 @@ class ParticleFilter(Node):
 
         self.odom_pose = new_pose
         new_odom_xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose)
-        print("x: {0}, y: {1}, yaw: {2}".format(*new_odom_xy_theta))
+        # print("x: {0}, y: {1}, yaw: {2}".format(*new_odom_xy_theta))
 
         if not self.current_odom_xy_theta:
             self.current_odom_xy_theta = new_odom_xy_theta
@@ -164,7 +165,7 @@ class ParticleFilter(Node):
             self.update_particles_with_odom()    # update based on odometry
             self.update_particles_with_laser(r, theta)   # update based on laser scan
             self.update_robot_pose()                # update robot's pose based on particles
-            self.resample_particles()               # resample particles to focus on areas of high density
+            #self.resample_particles()               # resample particles to focus on areas of high density
         # publish particles (so things like rviz can see them)
         self.publish_particles(msg.header.stamp)
 
@@ -172,7 +173,9 @@ class ParticleFilter(Node):
         return math.fabs(new_odom_xy_theta[0] - self.current_odom_xy_theta[0]) > self.d_thresh or \
                math.fabs(new_odom_xy_theta[1] - self.current_odom_xy_theta[1]) > self.d_thresh or \
                math.fabs(new_odom_xy_theta[2] - self.current_odom_xy_theta[2]) > self.a_thresh
-
+    
+    def mean_angle(self, deg):
+        return phase(sum(rect(1, d) for d in deg)/len(deg))
 
     def update_robot_pose(self):
         """ Update the estimate of the robot's pose given the updated particles.
@@ -185,7 +188,23 @@ class ParticleFilter(Node):
 
         # TODO: assign the latest pose into self.robot_pose as a geometry_msgs.Pose object
         # just to get started we will fix the robot's pose to always be at the origin
-        self.robot_pose = Pose()
+        total_x = 0
+        total_y = 0
+        theta_list = []
+
+        for particle in self.particle_cloud:
+            total_x += particle.x
+            total_y += particle.y
+            theta_list.append(particle.theta)
+
+        mean_x = total_x/self.n_particles
+        mean_y = total_y/self.n_particles
+        mean_theta = self.mean_angle(theta_list)
+
+        temp_particle = Particle(x=mean_x, y=mean_y, theta=mean_theta)
+        new_pose = temp_particle.as_pose()
+
+        self.robot_pose = new_pose
 
         self.transform_helper.fix_map_to_odom_transform(self.robot_pose,
                                                         self.odom_pose)
@@ -303,7 +322,7 @@ class ParticleFilter(Node):
         for i in range(self.n_particles):
             x = xy_theta[0] + np.random.random() * unit - unit/2
             y = xy_theta[1] + np.random.random() * unit - unit/2
-            theta = np.random.randint(360)
+            theta = np.random.randint(360) * math.pi /180.0
             self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
             # # Testing purpose
