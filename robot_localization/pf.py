@@ -77,14 +77,15 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 1      # the number of particles to use
+        self.n_particles = 300      # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
         # TODO: define additional constants if needed
-        self.particle_init_range = 5
+        self.particle_init_range = 3
         self.pub_marker = self.create_publisher(Marker, 'test_marker', 10)
+        self.resample_percentage = 0.5
 
         # pose_listener responds to selection of a new approximate robot location (for instance using rviz)
         self.create_subscription(PoseWithCovarianceStamped, 'initialpose', self.update_initial_pose, 10)
@@ -168,7 +169,7 @@ class ParticleFilter(Node):
             self.update_particles_with_odom()    # update based on odometry
             self.update_particles_with_laser(r, theta)   # update based on laser scan
             self.update_robot_pose()                # update robot's pose based on particles
-            #self.resample_particles()               # resample particles to focus on areas of high density
+            self.resample_particles()               # resample particles to focus on areas of high density
         # publish particles (so things like rviz can see them)
         self.publish_particles(msg.header.stamp)
 
@@ -259,29 +260,36 @@ class ParticleFilter(Node):
         # if the particle cloud is not empty
         if self.particle_cloud:
             probabilities = [particle.w for particle in self.particle_cloud]
-            resample_num = 1
-            resample = draw_random_sample(self.particle_cloud, probabilities, resample_num)
+            unsample_num = round(self.n_particles * self.resample_percentage)
+            unsampled = draw_random_sample(self.particle_cloud, probabilities, unsample_num)
 
-            # update the resampled particle's locations 
-            unsampled = np.setdiff1d(self.particle_cloud, resample)
-            for particle in resample:
+            #print(probabilities)
+            #print(self.particle_cloud)
+            #print(unsampled)
+
+            resample = []
+
+            while(len(unsampled) + len(resample) < self.n_particles):
                 # update resample particle location with a randomly selected particle that was not resampled
+                particle = Particle()
                 replacement = np.random.choice(unsampled)
                 particle.x = replacement.x
                 particle.y = replacement.y
                 particle.theta = replacement.theta
-
-                # QUESTION: should I change the weight of the particles as well?
+                particle.w = replacement.w
 
                 # add noise to the particles
-                position_noise = 0.5
-                theta_noise = 0.5
+                position_noise = 3
+                theta_noise = 3
                 particle.x = np.random.normal(loc=particle.x, scale=particle.w * position_noise)
                 particle.y = np.random.normal(loc=particle.y, scale=particle.w * position_noise)
                 particle.theta = np.random.normal(loc=particle.theta, scale=particle.w * theta_noise)
 
+                resample.append(particle)
+
             # update particle_cloud
-            self.particle_cloud = np.concatenate((resample, unsampled))
+            self.particle_cloud = unsampled + resample
+            #print(self.particle_cloud)
 
     def create_marker(self, x, y) -> Marker:
         # create a sphere marker at object centroid location
@@ -331,12 +339,17 @@ class ParticleFilter(Node):
                 #     print(particle.theta * 180 / math.pi)
                 #     marker = self.create_marker(x,y)
                 #     self.pub_marker.publish(marker)
+
+            if total_num > 0 and dist_tot != 0:
+                distance_average = dist_tot/total_num
+                particle.w = 1/distance_average
+            else:
+                particle.w = 0
                 
-            distance_average = dist_tot/total_num
             # update particle weight based on dist_tot
-            particle.w = np.random.normal(loc=1, scale=1/distance_average)
-            print(dist_tot/total_num)
-            # print(particle.w)
+            
+            # print(dist_tot/total_num)
+            #print(particle.w)
 
 
     def update_initial_pose(self, msg):
@@ -357,17 +370,16 @@ class ParticleFilter(Node):
         # TODO create particles
         unit = self.particle_init_range
         for i in range(self.n_particles):
-            # x = xy_theta[0] + np.random.random() * unit - unit/2
-            # y = xy_theta[1] + np.random.random() * unit - unit/2
-            # theta = np.random.randint(360) * math.pi /180.0
-            # self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
-
-            # Testing purpose
-            x = xy_theta[0]
-            y = xy_theta[1]
-            theta = xy_theta[2]
+            x = xy_theta[0] + np.random.random() * unit - unit/2
+            y = xy_theta[1] + np.random.random() * unit - unit/2
+            theta = np.random.randint(360) * math.pi /180.0
             self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
+            # # Testing purpose
+            # x = xy_theta[0]
+            # y = xy_theta[1]
+            # theta = xy_theta[2]
+            # self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
         self.normalize_particles()
 
