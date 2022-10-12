@@ -267,7 +267,21 @@ class ParticleFilter(Node):
             theta: the angle relative to the robot frame for each corresponding reading 
         """
         # TODO: implement this
-        pass
+
+        # for every particle calculate the particle weight based on nearest obstacle dist over 360 deg
+        for particle in self.particle_cloud:
+            dist_tot = 0
+
+            # for every 1 degree calculate the nearest obstacle distance
+            for deg in range(0, 360):
+                x = particle.x + r * cos(theta + deg) # unsure if it is 'theta + deg' or 'theta + particle.theta' or 'deg + particle.theta'
+                y = particle.y + r * sin(theta + deg)
+                obstacle_dist = get_closest_obstacle_distance(x=x, y=y)
+                dist_tot += obstacle_dist
+            
+            # update particle weight based on dist_tot
+            particle.w = np.random.normal(loc=particle.w, scale=particle.w * noise)
+
 
     def update_initial_pose(self, msg):
         """ Callback function to handle re-initializing the particle filter based on a pose estimate.
