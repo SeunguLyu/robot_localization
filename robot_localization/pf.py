@@ -75,7 +75,7 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 300      # the number of particles to use
+        self.n_particles = 1      # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
@@ -290,16 +290,27 @@ class ParticleFilter(Node):
         # for every particle calculate the particle weight based on nearest obstacle dist over 360 deg
         for particle in self.particle_cloud:
             dist_tot = 0
+            total_num = 0
 
             # for every 1 degree calculate the nearest obstacle distance
             for deg in range(0, 360):
-                x = particle.x + r * cos(theta + deg) # unsure if it is 'theta + deg' or 'theta + particle.theta' or 'deg + particle.theta'
-                y = particle.y + r * sin(theta + deg)
-                obstacle_dist = get_closest_obstacle_distance(x=x, y=y)
-                dist_tot += obstacle_dist
-            
+                x = particle.x - r[deg] * math.sin(theta[deg] + particle.theta) # unsure if it is 'theta + deg' or 'theta + particle.theta' or 'deg + particle.theta'
+                y = particle.y + r[deg] * math.cos(theta[deg] + particle.theta)
+                obstacle_dist = self.occupancy_field.get_closest_obstacle_distance(x=x, y=y)
+                if not math.isnan(obstacle_dist):
+                    dist_tot += obstacle_dist
+                    total_num += 1
+
+                # if deg == 30:
+                #     print(particle.x)
+                #     print(x)
+                #     print(particle.y)
+                #     print(y)
+                #     print(particle.theta * 180 / math.pi)
+                
+            print(dist_tot/total_num)
             # update particle weight based on dist_tot
-            particle.w = np.random.normal(loc=particle.w, scale=particle.w * noise)
+            particle.w = np.random.normal(loc=particle.w, scale=particle.w)
 
 
     def update_initial_pose(self, msg):
@@ -325,7 +336,7 @@ class ParticleFilter(Node):
             theta = np.random.randint(360) * math.pi /180.0
             self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
-            # # Testing purpose
+            # Testing purpose
             # x = xy_theta[0]
             # y = xy_theta[1]
             # theta = xy_theta[2]
