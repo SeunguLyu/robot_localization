@@ -296,7 +296,10 @@ class ParticleFilter(Node):
                 x = particle.x + r * cos(theta + deg) # unsure if it is 'theta + deg' or 'theta + particle.theta' or 'deg + particle.theta'
                 y = particle.y + r * sin(theta + deg)
                 obstacle_dist = get_closest_obstacle_distance(x=x, y=y)
-                dist_tot += obstacle_dist
+
+                # handle NaN case
+                if not np.isnan(obstacle_dist):
+                    dist_tot += obstacle_dist
             
             # update particle weight based on dist_tot
             particle.w = np.random.normal(loc=particle.w, scale=particle.w * noise)
