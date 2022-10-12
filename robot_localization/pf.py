@@ -2,6 +2,7 @@
 
 """ This is the starter code for the robot localization project """
 
+from turtle import distance
 import rclpy
 from threading import Thread
 from rclpy.time import Time
@@ -9,6 +10,7 @@ from rclpy.node import Node
 from std_msgs.msg import Header
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, Pose, Point, Quaternion
+from visualization_msgs.msg import Marker
 from rclpy.duration import Duration
 import math
 from cmath import rect, phase
@@ -82,6 +84,7 @@ class ParticleFilter(Node):
 
         # TODO: define additional constants if needed
         self.particle_init_range = 5
+        self.pub_marker = self.create_publisher(Marker, 'test_marker', 10)
 
         # pose_listener responds to selection of a new approximate robot location (for instance using rviz)
         self.create_subscription(PoseWithCovarianceStamped, 'initialpose', self.update_initial_pose, 10)
@@ -280,6 +283,23 @@ class ParticleFilter(Node):
             # update particle_cloud
             self.particle_cloud = np.concatenate((resample, unsampled))
 
+    def create_marker(self, x, y) -> Marker:
+        # create a sphere marker at object centroid location
+        marker = Marker()
+        marker.header.frame_id = "map"
+        marker.color.a = 1.0
+        marker.color.r = 1.0
+        marker.color.g = 0.5
+        marker.color.b = 0.5
+        marker.pose.position.x = x
+        marker.pose.position.y = y
+        marker.pose.position.z = 0.0
+        marker.scale.x = 0.1
+        marker.scale.y = 0.1
+        marker.scale.z = 0.1
+        marker.type = Marker.SPHERE
+        return marker
+
     def update_particles_with_laser(self, r, theta):
         """ Updates the particle weights in response to the scan data
             r: the distance readings to obstacles
@@ -294,23 +314,29 @@ class ParticleFilter(Node):
 
             # for every 1 degree calculate the nearest obstacle distance
             for deg in range(0, 360):
-                x = particle.x - r[deg] * math.sin(theta[deg] + particle.theta) # unsure if it is 'theta + deg' or 'theta + particle.theta' or 'deg + particle.theta'
-                y = particle.y + r[deg] * math.cos(theta[deg] + particle.theta)
+                x = particle.x + r[deg] * math.cos(theta[deg] + particle.theta) # unsure if it is 'theta + deg' or 'theta + particle.theta' or 'deg + particle.theta'
+                y = particle.y + r[deg] * math.sin(theta[deg] + particle.theta)
+                if (math.isinf(x) or math.isinf(y) or math.isnan(x) or math.isnan(y)):
+                    continue
                 obstacle_dist = self.occupancy_field.get_closest_obstacle_distance(x=x, y=y)
                 if not math.isnan(obstacle_dist):
                     dist_tot += obstacle_dist
                     total_num += 1
 
-                # if deg == 30:
+                # if deg == 90:
                 #     print(particle.x)
                 #     print(x)
                 #     print(particle.y)
                 #     print(y)
                 #     print(particle.theta * 180 / math.pi)
+                #     marker = self.create_marker(x,y)
+                #     self.pub_marker.publish(marker)
                 
-            print(dist_tot/total_num)
+            distance_average = dist_tot/total_num
             # update particle weight based on dist_tot
-            particle.w = np.random.normal(loc=particle.w, scale=particle.w)
+            particle.w = np.random.normal(loc=1, scale=1/distance_average)
+            print(dist_tot/total_num)
+            # print(particle.w)
 
 
     def update_initial_pose(self, msg):
@@ -331,16 +357,16 @@ class ParticleFilter(Node):
         # TODO create particles
         unit = self.particle_init_range
         for i in range(self.n_particles):
-            x = xy_theta[0] + np.random.random() * unit - unit/2
-            y = xy_theta[1] + np.random.random() * unit - unit/2
-            theta = np.random.randint(360) * math.pi /180.0
-            self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
+            # x = xy_theta[0] + np.random.random() * unit - unit/2
+            # y = xy_theta[1] + np.random.random() * unit - unit/2
+            # theta = np.random.randint(360) * math.pi /180.0
+            # self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
             # Testing purpose
-            # x = xy_theta[0]
-            # y = xy_theta[1]
-            # theta = xy_theta[2]
-            # self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
+            x = xy_theta[0]
+            y = xy_theta[1]
+            theta = xy_theta[2]
+            self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
 
         self.normalize_particles()
