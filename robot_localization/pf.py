@@ -267,8 +267,8 @@ class ParticleFilter(Node):
 
             for particle in self.particle_cloud:
                 # add noise to the particles
-                position_noise = 5
-                theta_noise = 3
+                position_noise = 10
+                theta_noise = 10
                 particle.x = np.random.normal(loc=particle.x, scale=particle.w * position_noise)
                 particle.y = np.random.normal(loc=particle.y, scale=particle.w * position_noise)
                 particle.theta = np.random.normal(loc=particle.theta, scale=particle.w * theta_noise)
