@@ -77,14 +77,13 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 300      # the number of particles to use
+        self.n_particles = 300          # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
-        # TODO: define additional constants if needed
-        self.particle_init_range = 5
-        self.pub_marker = self.create_publisher(Marker, 'test_marker', 10)
+        self.particle_init_range = 5    # the range particles will be created around initial position
+        self.pub_marker = self.create_publisher(Marker, 'test_marker', 10)  # marker used for testing
 
         # pose_listener responds to selection of a new approximate robot location (for instance using rviz)
         self.create_subscription(PoseWithCovarianceStamped, 'initialpose', self.update_initial_pose, 10)
@@ -186,24 +185,22 @@ class ParticleFilter(Node):
                 (1): compute the mean pose
                 (2): compute the most likely pose (i.e. the mode of the distribution)
         """
-        # first make sure that the particle weights are normalized
-        self.normalize_particles()
-
-        # TODO: assign the latest pose into self.robot_pose as a geometry_msgs.Pose object
-        # just to get started we will fix the robot's pose to always be at the origin
         total_x = 0
         total_y = 0
         theta_list = []
 
+        # add all particles to get average value
         for particle in self.particle_cloud:
             total_x += particle.x
             total_y += particle.y
             theta_list.append(particle.theta)
 
+        # compute average
         mean_x = total_x/self.n_particles
         mean_y = total_y/self.n_particles
         mean_theta = self.mean_angle(theta_list)
 
+        # create temporary particle to use as_pose function
         temp_particle = Particle(x=mean_x, y=mean_y, theta=mean_theta)
         new_pose = temp_particle.as_pose()
 
@@ -231,20 +228,21 @@ class ParticleFilter(Node):
             self.current_odom_xy_theta = new_odom_xy_theta
             return
 
-        # TODO: modify particles using delta
-        #print("x: {0}, y: {1}, yaw: {2}".format(*delta))
+        # compute angle of rotation toward the new particle position
         angle1 = old_odom_xy_theta[2]
         angle2 = math.atan2(new_odom_xy_theta[1] - old_odom_xy_theta[1], new_odom_xy_theta[0] - old_odom_xy_theta[0])
         u_theta = angle1 - angle2
+
+        # compute the distance toward the new particle position
         u_d = math.sqrt(delta[0] ** 2 + delta[1] ** 2)
 
-        #print(u_r, math.degrees(u_theta))
         for particle in self.particle_cloud:
+            # move the particle to the new particle position
             p_theta = particle.theta - u_theta
             particle.x += u_d * math.cos(p_theta)
             particle.y += u_d * math.sin(p_theta)
+            # rotate the particle by delta yaw
             particle.theta += delta[2]
-
 
     def resample_particles(self):
         """ Resample the particles according to the new particle weights.
@@ -255,27 +253,27 @@ class ParticleFilter(Node):
         # make sure the distribution is normalized
         self.normalize_particles()
         
-        # TODO: fill out the rest of the implementation
         # if the particle cloud is not empty
         if self.particle_cloud:
+            # resample the particles by their weight
+            # elements in probabilities list should add up to 1
             probabilities = [particle.w for particle in self.particle_cloud]
+
+            # resample with the given probabilities
             self.particle_cloud = draw_random_sample(self.particle_cloud, probabilities, self.n_particles)
 
-            #print(probabilities)
-            #print(self.particle_cloud)
-            #print(unsampled)
-
+            # add noise to the particles
             for particle in self.particle_cloud:
-                # add noise to the particles
                 position_noise = 10
                 theta_noise = 10
                 particle.x = np.random.normal(loc=particle.x, scale=particle.w * position_noise)
                 particle.y = np.random.normal(loc=particle.y, scale=particle.w * position_noise)
                 particle.theta = np.random.normal(loc=particle.theta, scale=particle.w * theta_noise)
 
-
     def create_marker(self, x, y) -> Marker:
-        # create a sphere marker at object centroid location
+        """ Create marker on the map frame for testing purpose.
+            x,y: coordinate for the marker
+        """
         marker = Marker()
         marker.header.frame_id = "map"
         marker.color.a = 1.0
@@ -296,8 +294,6 @@ class ParticleFilter(Node):
             r: the distance readings to obstacles
             theta: the angle relative to the robot frame for each corresponding reading 
         """
-        # TODO: implement this
-
         # for every particle calculate the particle weight based on nearest obstacle dist over 360 deg
         for particle in self.particle_cloud:
             dist_tot = 0
@@ -307,23 +303,18 @@ class ParticleFilter(Node):
             for deg in range(len(theta)):
                 x = particle.x + r[deg] * math.cos(theta[deg] + particle.theta)
                 y = particle.y + r[deg] * math.sin(theta[deg] + particle.theta)
+                # if the particle has nan or inf, add big distance to total so that the weight of this particle goes down
                 if (math.isinf(x) or math.isinf(y)) or (math.isnan(self.occupancy_field.get_closest_obstacle_distance(x=x, y=y))):
                     dist_tot += 100
+                # else just add the closest obstacle distance
                 else:
                     dist_tot += self.occupancy_field.get_closest_obstacle_distance(x=x, y=y)
                 
                 total_num += 1
-
-                # if deg == 90:
-                #     print(particle.x)
-                #     print(x)
-                #     print(particle.y)
-                #     print(y)
-                #     print(particle.theta * 180 / math.pi)
-                #     marker = self.create_marker(x,y)
-                #     self.pub_marker.publish(marker)
-
+            
+            # calculate the average distance
             dist_mean = dist_tot/total_num
+            # calculate weight from the average distance
             particle.w = 1/dist_mean
 
     def update_initial_pose(self, msg):
@@ -341,34 +332,29 @@ class ParticleFilter(Node):
             xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose)
         self.particle_cloud = []
 
-        # TODO create particles
+        # define initialization range
         unit = self.particle_init_range
         for i in range(self.n_particles):
+            # create random particle inside the range
             x = xy_theta[0] + np.random.random() * unit - unit/2
             y = xy_theta[1] + np.random.random() * unit - unit/2
             theta = np.random.randint(360) * math.pi /180.0
             self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
 
-            # # Testing purpose
-            # x = xy_theta[0]
-            # y = xy_theta[1]
-            # theta = xy_theta[2]
-            # self.particle_cloud.append(Particle(x=x, y=y, theta=theta))
-
         self.normalize_particles()
 
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
-        # TODO: implement this
-
         w_list = []
 
+        # convert weights to normal distribution
         for particle in self.particle_cloud:
             w_list.append(particle.w)
         
         w_list = (w_list - np.mean(w_list))/np.std(w_list)
         w_list += abs(np.min(w_list))
 
+        # change the distribution so that it sums to 1.0
         total_weight = 0
 
         for w in w_list:
@@ -376,8 +362,7 @@ class ParticleFilter(Node):
         
         w_list = w_list/total_weight
 
-        #print(w_list)
- 
+        # assign normalized weights
         for i in range(len(w_list)):
             self.particle_cloud[i].w = w_list[i]
 
