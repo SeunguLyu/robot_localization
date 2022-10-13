@@ -1,22 +1,43 @@
 # Robot Localization
+![](images/particle_filter_demo_1.gif)
+![](images/particle_filter_demo_2.gif)
 
-# Overview
+| Bag File | Based On | Demo |
+| ------------- | ------------- | ----- |
+| [macfirst_take_2](bags/macfirst_take_2) | [macfirst_floor_take_1](bags/macfirst_floor_take_1) | [particle_filter_demo_1](images/particle_filter_demo_1.gif)|
+| [mac_take_2](bags/mac_take_2) | [macfirst_floor_take_2](bags/macfirst_floor_take_2) | [particle_filter_demo_2](images/particle_filter_demo_2.gif)|
 
-# Initialize Particles
 
-# Update Particle Positions
+## Overview
+***
 
-# Update Particle Weights
 
-# Update Robot Position On Map
+## Initialize Particles
+***
 
-# Resample Particles
+## Update Particle Positions
+***
 
-# Conclusion
+![](images/particle_update.png)
 
-## Challenges
+## Update Particle Weights
+***
 
-## Improvements
+## Update Robot Position On Map
+***
 
-## Lessons
+![](images/robot_position.png)
+
+## Resample Particles
+***
+
+![](images/resample_particle.png)
+
+## Conclusion
+***
+### Challenges
+
+### Improvements
+
+### Lessons
 
