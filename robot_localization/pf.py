@@ -77,15 +77,14 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 100      # the number of particles to use
+        self.n_particles = 300      # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
 
         # TODO: define additional constants if needed
-        self.particle_init_range = 3
+        self.particle_init_range = 5
         self.pub_marker = self.create_publisher(Marker, 'test_marker', 10)
-        self.resample_percentage = 0.5
 
         # pose_listener responds to selection of a new approximate robot location (for instance using rviz)
         self.create_subscription(PoseWithCovarianceStamped, 'initialpose', self.update_initial_pose, 10)
@@ -169,7 +168,7 @@ class ParticleFilter(Node):
             self.update_particles_with_odom()    # update based on odometry
             self.update_particles_with_laser(r, theta)   # update based on laser scan
             self.update_robot_pose()                # update robot's pose based on particles
-            #self.resample_particles()               # resample particles to focus on areas of high density
+            self.resample_particles()               # resample particles to focus on areas of high density
         # publish particles (so things like rviz can see them)
         self.publish_particles(msg.header.stamp)
 
@@ -266,11 +265,9 @@ class ParticleFilter(Node):
             #print(self.particle_cloud)
             #print(unsampled)
 
-            resample = []
-
             for particle in self.particle_cloud:
                 # add noise to the particles
-                position_noise = 3
+                position_noise = 5
                 theta_noise = 3
                 particle.x = np.random.normal(loc=particle.x, scale=particle.w * position_noise)
                 particle.y = np.random.normal(loc=particle.y, scale=particle.w * position_noise)
@@ -307,11 +304,11 @@ class ParticleFilter(Node):
             total_num = 0
 
             # for every 1 degree calculate the nearest obstacle distance
-            for deg in range(0, 360):
-                x = particle.x + r[deg] * math.cos(theta[deg] + particle.theta) # unsure if it is 'theta + deg' or 'theta + particle.theta' or 'deg + particle.theta'
+            for deg in range(len(theta)):
+                x = particle.x + r[deg] * math.cos(theta[deg] + particle.theta)
                 y = particle.y + r[deg] * math.sin(theta[deg] + particle.theta)
-                if (math.isnan(self.occupancy_field.get_closest_obstacle_distance(x=x, y=y))):
-                    dist_tot += 1000.0
+                if (math.isinf(x) or math.isinf(y)) or (math.isnan(self.occupancy_field.get_closest_obstacle_distance(x=x, y=y))):
+                    dist_tot += 100
                 else:
                     dist_tot += self.occupancy_field.get_closest_obstacle_distance(x=x, y=y)
                 
@@ -328,12 +325,6 @@ class ParticleFilter(Node):
 
             dist_mean = dist_tot/total_num
             particle.w = 1/dist_mean
-                
-            # update particle weight based on dist_tot
-            
-            # print(dist_tot/total_num)
-            #print(particle.w)
-
 
     def update_initial_pose(self, msg):
         """ Callback function to handle re-initializing the particle filter based on a pose estimate.
@@ -369,12 +360,26 @@ class ParticleFilter(Node):
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
         # TODO: implement this
-        total_weight = 0
-        for particle in self.particle_cloud:
-            total_weight += particle.w
+
+        w_list = []
 
         for particle in self.particle_cloud:
-            particle.w = particle.w/total_weight
+            w_list.append(particle.w)
+        
+        w_list = (w_list - np.mean(w_list))/np.std(w_list)
+        w_list += abs(np.min(w_list))
+
+        total_weight = 0
+
+        for w in w_list:
+            total_weight += w
+        
+        w_list = w_list/total_weight
+
+        #print(w_list)
+ 
+        for i in range(len(w_list)):
+            self.particle_cloud[i].w = w_list[i]
 
     def publish_particles(self, timestamp):
         particles_conv = []
