@@ -9,32 +9,30 @@
 
 
 ## Overview
-***
 
 
 ## Initialize Particles
-***
+
+![](images/particle_init.png)
 
 ## Update Particle Positions
-***
 
 ![](images/particle_update.png)
 
 ## Update Particle Weights
-***
+
+![](images/particle_weight_measure.png)
 
 ## Update Robot Position On Map
-***
 
 ![](images/robot_position.png)
 
 ## Resample Particles
-***
 
 ![](images/resample_particle.png)
 
 ## Conclusion
-***
+
 ### Challenges
 
 ### Improvements
