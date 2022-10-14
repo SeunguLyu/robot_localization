@@ -20,7 +20,7 @@ Below is a demonstration of a simulation of the Neato determining its position a
 
 ## Initialize Particles
 
-Before anything, we must initialize particles within the map. Each particle is a representation of the Neato's potential location and orientation in the map. Initialization creates N particles within the defined bounding area from the center given by the 2D Pose Estimate. An example of particle initialization with 14 particles and a bounding box unit of 4 is seen below:
+Before anything, we must initialize particles within the map. Each particle is a representation of the Neato's potential location and orientation on the map. Initialization creates N particles within the defined bounding area from the center given by the 2D Pose Estimate. An example of particle initialization with 14 particles and a bounding box unit of 4 is seen below:
 
 ![](images/particle_init.png)
 
@@ -28,7 +28,7 @@ Before anything, we must initialize particles within the map. Each particle is a
 
 Once the Neato starts moving around, we must also update the positions of the particles relative to the Neato's movement. In order to do so, we follow the steps below for every particle in the particle cloud:
 
-1. Compute the change in x, y, and theta between robot's current and previous state in the odom frame
+1. Compute the change in x, y, and theta between the robot's current and previous state in the odom frame
 2. Compute the angle of rotation towards the new particle position in the map frame
 3. Compute the distance from the previous location to the new location in the (WHAT FRAME?)
 
@@ -44,13 +44,13 @@ As the robot navigates around its environment, it receives laser scan data that 
 
 ## Update Robot Position On Map
 
-Once all the particle are re-weighted, the mean of all the particles' x, y, and theta relative to the map frame is calculated. This mean is set to be the next position of the Neato in the map. An example of this step can be seen below, where the robot position is updated based on the location and orientation of three particles.
+Once all the particles are re-weighted, the mean of all the particles' x, y, and theta relative to the map frame is calculated. This mean is set to be the next position of the Neato on the map. An example of this step can be seen below, where the robot position is updated based on the location and orientation of three particles.
 
 ![](images/robot_position.png)
 
 ## Resample Particles
 
-Once the robot position on the map is updated, we randomly select n (CHECK HERE) particles based on their unlikely probability of the particle being the Neato's actual location and orientation, and update those particles with noise. Before randomly drawing a sample of the particles from the `self.particle_cloud`, we made sure to normalize the weights of the particles to use each particle's normalized weight as the proability which the particle is an actual representation of the Neato's location and orientation. The higher the weight of the particle, the more likely the particle is to be a representation of the Neato in the map, and vice versa. Using this probability array, we draw a random sample of particles using `draw_random_sample()`, which most likely results in particles that are less likely to be accurate representations of the Neato in the map. These resampled particles are then clustered closer to particles with higher weights/probabilities with some noise. The distribution of particles before and after resampling is shown in the picture below.
+Once the robot position on the map is updated, we randomly select n (CHECK HERE) particles based on their unlikely probability of the particle being the Neato's actual location and orientation and update those particles with noise. Before randomly drawing a sample of the particles from the `self.particle_cloud`, we made sure to normalize the weights of the particles to use each particle's normalized weight as the probability which the particle is an actual representation of the Neato's location and orientation. The higher the weight of the particle, the more likely the particle is to be a representation of the Neato in the map, and vice versa. Using this probability array, we draw a random sample of particles using `draw_random_sample()`, which most likely results in particles that are less likely to be accurate representations of the Neato in the map. These resampled particles are then clustered closer to particles with higher weights/probabilities with some noise. The distribution of particles before and after resampling is shown in the picture below.
 
 ![](images/resample_particle.png)
 
@@ -62,7 +62,7 @@ We found 300 particles to be sufficient to determine the Neato's location in the
 
 ### Improvements
 
-Our current implementation of `update_particles_with_odom()` is a rather crude approach that breaks down frame translation and rotation into smaller steps, resulting in a longer run-time. However, this can be optimized with a more elegant approach of using a combination of rotation matrixes and the Numpy library. This way, the frame translation and rotation can be easily represented as matrix multiplications. 
+Our current implementation of `update_particles_with_odom()` is a rather crude approach that breaks down frame translation and rotation into smaller steps, resulting in a longer run-time. However, this can be optimized with a more elegant approach of using a combination of rotation matrixes and the Numpy library. This way, the frame translation, and rotation can be easily represented as matrix multiplications. 
 
 ### Lessons
 
